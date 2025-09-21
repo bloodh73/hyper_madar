@@ -1,0 +1,51 @@
+name: product_manager
+description: A Flutter application for product management with barcode display
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI Components
+  cupertino_icons: ^1.0.2
+  
+  # Database
+  mysql1: ^0.20.0
+  sqflite: ^2.3.0
+  
+  # Barcode
+  qr_flutter: ^4.1.0
+  barcode_widget: ^2.0.4
+  
+  # Excel import
+  excel: ^4.0.6
+
+  
+  # HTTP requests
+  http: ^1.1.0
+  
+  # State management
+  provider: ^6.1.1
+  
+  # Utilities
+  path_provider: ^2.1.1
+  shared_preferences: ^2.2.2
+  file_picker: ^10.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/

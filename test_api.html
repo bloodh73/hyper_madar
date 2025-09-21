@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تست API دیتابیس آنلاین</title>
+    <style>
+        body {
+            font-family: 'Tahoma', sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.success {
+            background-color: #27ae60;
+        }
+        button.error {
+            background-color: #e74c3c;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.success {
+            background-color: #d5f4e6;
+            border: 1px solid #27ae60;
+            color: #27ae60;
+        }
+        .result.error {
+            background-color: #fadbd8;
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #d5f4e6;
+            color: #27ae60;
+            border: 1px solid #27ae60;
+        }
+        .status.disconnected {
+            background-color: #fadbd8;
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 تست API دیتابیس آنلاین</h1>
+        
+        <div id="status" class="status disconnected">
+            وضعیت: قطع
+        </div>
+
+        <div class="section">
+            <h3>🔗 تست اتصال</h3>
+            <button onclick="testConnection()">تست اتصال</button>
+            <div id="connectionResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📋 دریافت محصولات</h3>
+            <div class="form-group">
+                <label>صفحه:</label>
+                <input type="number" id="page" value="1" min="1">
+            </div>
+            <div class="form-group">
+                <label>تعداد در هر صفحه:</label>
+                <input type="number" id="limit" value="10" min="1" max="100">
+            </div>
+            <button onclick="getProducts()">دریافت محصولات</button>
+            <div id="productsResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔍 جستجو</h3>
+            <div class="form-group">
+                <label>کلمه جستجو:</label>
+                <input type="text" id="searchQuery" placeholder="نام محصول، بارکد، تامین کننده...">
+            </div>
+            <button onclick="searchProducts()">جستجو</button>
+            <div id="searchResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>➕ افزودن محصول</h3>
+            <div class="form-group">
+                <label>بارکد:</label>
+                <input type="text" id="barcode" placeholder="1234567890123">
+            </div>
+            <div class="form-group">
+                <label>نام محصول:</label>
+                <input type="text" id="productName" placeholder="لپ‌تاپ ایسوس">
+            </div>
+            <div class="form-group">
+                <label>تامین کننده:</label>
+                <input type="text" id="supplier" placeholder="شرکت فناوری پارس">
+            </div>
+            <div class="form-group">
+                <label>قیمت خرید:</label>
+                <input type="number" id="purchasePrice" placeholder="15000000">
+            </div>
+            <div class="form-group">
+                <label>قیمت اصلی:</label>
+                <input type="number" id="originalPrice" placeholder="18000000">
+            </div>
+            <div class="form-group">
+                <label>قیمت نهایی:</label>
+                <input type="number" id="discountedPrice" placeholder="16000000">
+            </div>
+            <div class="form-group">
+                <label>کد تامین کننده:</label>
+                <input type="text" id="supplierCode" placeholder="ASUS001">
+            </div>
+            <button onclick="addProduct()">افزودن محصول</button>
+            <div id="addResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📊 آمار کلی</h3>
+            <button onclick="getStats()">دریافت آمار</button>
+            <div id="statsResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://blizzardping.ir/hyper.php';
+        
+        // تست اتصال
+        async function testConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.textContent = 'در حال تست اتصال...';
+            
+            try {
+                const response = await fetch(`${API_URL}?action=test`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                    updateStatus(true);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `خطا: ${data.error}`;
+                    updateStatus(false);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `خطا در اتصال: ${error.message}`;
+                updateStatus(false);
+            }
+        }
+        
+        // دریافت محصولات
+        async function getProducts() {
+            const resultDiv = document.getElementById('productsResult');
+            const page = document.getElementById('page').value;
+            const limit = document.getElementById('limit').value;
+            
+            resultDiv.textContent = 'در حال دریافت محصولات...';
+            
+            try {
+                const response = await fetch(`${API_URL}?action=products&page=${page}&limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `خطا: ${data.error}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `خطا در دریافت: ${error.message}`;
+            }
+        }
+        
+        // جستجو
+        async function searchProducts() {
+            const resultDiv = document.getElementById('searchResult');
+            const query = document.getElementById('searchQuery').value;
+            
+            if (!query.trim()) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'لطفاً کلمه جستجو را وارد کنید';
+                return;
+            }
+            
+            resultDiv.textContent = 'در حال جستجو...';
+            
+            try {
+                const response = await fetch(`${API_URL}?action=search&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `خطا: ${data.error}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `خطا در جستجو: ${error.message}`;
+            }
+        }
+        
+        // افزودن محصول
+        async function addProduct() {
+            const resultDiv = document.getElementById('addResult');
+            
+            const product = {
+                barcode: document.getElementById('barcode').value,
+                product_name: document.getElementById('productName').value,
+                supplier: document.getElementById('supplier').value,
+                purchase_price: parseFloat(document.getElementById('purchasePrice').value),
+                original_price: parseFloat(document.getElementById('originalPrice').value),
+                discounted_price: parseFloat(document.getElementById('discountedPrice').value),
+                supplier_code: document.getElementById('supplierCode').value
+            };
+            
+            // اعتبارسنجی
+            if (!product.barcode || !product.product_name || !product.supplier || 
+                !product.purchase_price || !product.original_price || !product.discounted_price || !product.supplier_code) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'لطفاً تمام فیلدها را پر کنید';
+                return;
+            }
+            
+            resultDiv.textContent = 'در حال افزودن محصول...';
+            
+            try {
+                const response = await fetch(`${API_URL}?action=product`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(product)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                    // پاک کردن فرم
+                    clearForm();
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `خطا: ${data.error}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `خطا در افزودن: ${error.message}`;
+            }
+        }
+        
+        // دریافت آمار
+        async function getStats() {
+            const resultDiv = document.getElementById('statsResult');
+            resultDiv.textContent = 'در حال دریافت آمار...';
+            
+            try {
+                const response = await fetch(`${API_URL}?action=test`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `خطا: ${data.error}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `خطا در دریافت آمار: ${error.message}`;
+            }
+        }
+        
+        // بروزرسانی وضعیت
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = 'وضعیت: متصل ✅';
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = 'وضعیت: قطع ❌';
+            }
+        }
+        
+        // پاک کردن فرم
+        function clearForm() {
+            document.getElementById('barcode').value = '';
+            document.getElementById('productName').value = '';
+            document.getElementById('supplier').value = '';
+            document.getElementById('purchasePrice').value = '';
+            document.getElementById('originalPrice').value = '';
+            document.getElementById('discountedPrice').value = '';
+            document.getElementById('supplierCode').value = '';
+        }
+        
+        // تست خودکار اتصال هنگام بارگذاری صفحه
+        window.onload = function() {
+            testConnection();
+        };
+    </script>
+</body>
+</html>
