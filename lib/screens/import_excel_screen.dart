@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-// import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import 'dart:convert';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
+import '../utils/price_formatter.dart';
 
 class ImportExcelScreen extends StatefulWidget {
   const ImportExcelScreen({super.key});
@@ -18,6 +20,16 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
   bool _isLoading = false;
   String _fileName = '';
   String _error = '';
+  ScaffoldMessengerState? _messenger;
+  NavigatorState? _navigator;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Cache ancestors to avoid looking them up after unmount
+    _messenger = ScaffoldMessenger.maybeOf(context);
+    _navigator = Navigator.maybeOf(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +58,7 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
                         Icon(Icons.info_outline, color: Colors.blue[600]),
                         const SizedBox(width: 8),
                         Text(
-                          'راهنمای فرمت فایل اکسل',
+                          'راهنمای فرمت فایل',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -57,7 +69,7 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'فایل اکسل باید شامل ستون‌های زیر باشد (به ترتیب):',
+                      'فایل Excel یا CSV باید شامل ستون‌های زیر باشد (به ترتیب):',
                       style: TextStyle(fontSize: 14),
                     ),
                     const SizedBox(height: 8),
@@ -70,6 +82,53 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
               ),
             ),
 
+            const SizedBox(height: 16),
+
+            // Database status
+            Consumer<ProductProvider>(
+              builder: (context, productProvider, child) {
+                return Card(
+                  color: productProvider.useOnline ? Colors.green[50] : Colors.orange[50],
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          productProvider.useOnline ? Icons.cloud_done : Icons.storage,
+                          color: productProvider.useOnline ? Colors.green[600] : Colors.orange[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                productProvider.useOnline ? 'دیتابیس آنلاین' : 'دیتابیس محلی',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: productProvider.useOnline ? Colors.green[800] : Colors.orange[800],
+                                ),
+                              ),
+                              Text(
+                                productProvider.useOnline 
+                                    ? 'محصولات به دیتابیس آنلاین وارد می‌شوند'
+                                    : 'محصولات به دیتابیس محلی وارد می‌شوند',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: productProvider.useOnline ? Colors.green[700] : Colors.orange[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+
             const SizedBox(height: 24),
 
             // File picker button
@@ -79,7 +138,7 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
               child: ElevatedButton.icon(
                 onPressed: _isLoading ? null : _pickExcelFile,
                 icon: const Icon(Icons.file_upload),
-                label: const Text('انتخاب فایل اکسل'),
+                label: const Text('انتخاب فایل (Excel یا CSV)'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[600],
                   foregroundColor: Colors.white,
@@ -156,12 +215,35 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
                         ),
                         title: Text(product.productName),
                         subtitle: Text('بارکد: ${product.barcode}'),
-                        trailing: Text(
-                          '${product.discountedPrice.toStringAsFixed(0)} تومان',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[600],
-                          ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              PriceFormatter.formatPrice(product.discountedPrice),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[600],
+                              ),
+                            ),
+                            if (product.hasDiscount())
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${product.getDiscountPercentage().toStringAsFixed(1)}% تخفیف',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red[700],
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     );
@@ -208,18 +290,9 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
 
   Future<void> _pickExcelFile() async {
     try {
-      // موقتاً غیرفعال شده - از دیتابیس آنلاین استفاده کنید
-      setState(() {
-        _error =
-            'وارد کردن از اکسل موقتاً غیرفعال است. از دیتابیس آنلاین استفاده کنید.';
-        _isLoading = false;
-      });
-
-      // TODO: فعال کردن file_picker بعداً
-      /*
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
+        allowedExtensions: ['xlsx', 'xls', 'csv'],
       );
 
       if (result != null) {
@@ -229,12 +302,74 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
           _fileName = result.files.first.name;
         });
 
-        await _parseExcelFile(result.files.first.path!);
+        String filePath = result.files.first.path!;
+        String extension = filePath.split('.').last.toLowerCase();
+        
+        if (extension == 'csv') {
+          await _parseCsvFile(filePath);
+        } else {
+          await _parseExcelFile(filePath);
+        }
       }
-      */
     } catch (e) {
       setState(() {
         _error = 'خطا در انتخاب فایل: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _parseCsvFile(String filePath) async {
+    try {
+      String content = await File(filePath).readAsString(encoding: utf8);
+      List<String> lines = content.split('\n');
+      
+      List<Product> products = [];
+      
+      // Skip header row (first line)
+      for (int i = 1; i < lines.length; i++) {
+        String line = lines[i].trim();
+        if (line.isEmpty) continue;
+        
+        List<String> fields = line.split(',');
+        if (fields.length < 7) {
+          print('Skipping line $i: insufficient fields (${fields.length})');
+          continue;
+        }
+        
+        try {
+          // Create a row-like structure for Product.fromExcelRow
+          List<dynamic> row = fields.map((field) => field.trim()).toList();
+          Product product = Product.fromExcelRow(row);
+          
+          print('Parsed CSV product: ${product.productName}, barcode: ${product.barcode}');
+          
+          if (product.barcode.toString().isNotEmpty &&
+              product.productName.isNotEmpty) {
+            products.add(product);
+            print('Added CSV product: ${product.productName}');
+          } else {
+            print('Skipped CSV product: empty barcode or name');
+          }
+        } catch (e) {
+          print('Error parsing CSV line $i: $e');
+          continue;
+        }
+      }
+      
+      setState(() {
+        _importedProducts = products;
+        _isLoading = false;
+        if (products.isEmpty) {
+          _error = 'هیچ محصول معتبری در فایل CSV یافت نشد. لطفاً مطمئن شوید که:\n'
+              '• فایل شامل حداقل 7 ستون است\n'
+              '• ستون اول (بارکد) و دوم (نام محصول) خالی نیستند\n'
+              '• فرمت فایل صحیح است (.csv)';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'خطا در خواندن فایل CSV: $e';
         _isLoading = false;
       });
     }
@@ -251,16 +386,26 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
         var sheet = excel.tables[table];
         if (sheet == null) continue;
 
+        print('Processing sheet: $table with ${sheet.maxRows} rows');
+        
         // Skip header row (first row)
         for (int rowIndex = 1; rowIndex < sheet.maxRows; rowIndex++) {
           var row = sheet.rows[rowIndex];
-          if (row.length < 7) continue; // Skip incomplete rows
+          if (row.length < 7) {
+            print('Skipping row $rowIndex: insufficient columns (${row.length})');
+            continue; // Skip incomplete rows
+          }
 
           try {
             Product product = Product.fromExcelRow(row);
-            if (product.barcode.toString().isEmpty &&
+            print('Parsed product: ${product.productName}, barcode: ${product.barcode}');
+            
+            if (product.barcode.toString().isNotEmpty &&
                 product.productName.isNotEmpty) {
               products.add(product);
+              print('Added product: ${product.productName}');
+            } else {
+              print('Skipped product: empty barcode or name');
             }
           } catch (e) {
             print('Error parsing row $rowIndex: $e');
@@ -273,7 +418,10 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
         _importedProducts = products;
         _isLoading = false;
         if (products.isEmpty) {
-          _error = 'هیچ محصول معتبری در فایل یافت نشد';
+          _error = 'هیچ محصول معتبری در فایل یافت نشد. لطفاً مطمئن شوید که:\n'
+              '• فایل شامل حداقل 7 ستون است\n'
+              '• ستون اول (بارکد) و دوم (نام محصول) خالی نیستند\n'
+              '• فرمت فایل صحیح است (.xlsx یا .xls)';
         }
       });
     } catch (e) {
@@ -293,32 +441,37 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
 
     try {
       final productProvider = context.read<ProductProvider>();
+      
+      
       List<int> insertedIds =
           await productProvider.importProducts(_importedProducts);
 
       if (mounted) {
         if (insertedIds.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          _messenger?.showSnackBar(
             SnackBar(
               content: Text('${insertedIds.length} محصول با موفقیت وارد شد'),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
+          _navigator?.maybePop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          String errorMessage = productProvider.error.isNotEmpty
+              ? productProvider.error
+              : 'خطا در وارد کردن محصولات';
+          
+          _messenger?.showSnackBar(
             SnackBar(
-              content: Text(productProvider.error.isNotEmpty
-                  ? productProvider.error
-                  : 'خطا در وارد کردن محصولات'),
+              content: Text(errorMessage),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messenger?.showSnackBar(
           SnackBar(
             content: Text('خطا: $e'),
             backgroundColor: Colors.red,

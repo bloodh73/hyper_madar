@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import '../models/product.dart';
+import '../utils/price_formatter.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -16,109 +17,133 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasDiscount = product.hasDiscount();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      elevation: 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with product name and delete button
+              // Top row: name + price chip + optional delete
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Text(
-                      product.productName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.productName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.business, size: 14, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                product.supplier,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  hasDiscount
+                      ? _buildDiscountPill(product)
+                      : _buildPriceChip(product.discountedPrice),
                   if (onDelete != null)
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      icon: const Icon(Icons.more_vert, color: Colors.grey),
                       onPressed: onDelete,
                       tooltip: 'حذف محصول',
                     ),
                 ],
               ),
 
-              const SizedBox(height: 12),
-
-              // Barcode
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
+              // Secondary price row (original vs discounted)
+              if (hasDiscount) ...[
+                const SizedBox(height: 6),
+                Row(
                   children: [
                     Text(
-                      'بارکد: ${product.barcode}',
+                      PriceFormatter.formatPrice(product.originalPrice),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.lineThrough,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    BarcodeWidget(
-                      barcode: Barcode.code128(),
-                      data: product.barcode.toString(),
-                      width: 200,
-                      height: 50,
-                      drawText: false,
-                    ),
+                    const SizedBox(width: 8),
+                    _buildPriceChip(product.discountedPrice),
                   ],
                 ),
+              ],
+
+              const SizedBox(height: 10),
+
+              // Barcode and supplier code compact row
+              Row(
+                children: [
+                  Icon(Icons.qr_code_2, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      product.barcode,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(Icons.tag, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatSupplierCode(product.supplierCode),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // Product details
-              _buildInfoRow(
-                  'تامین کننده:', product.supplier.toString(), Icons.business),
-              const SizedBox(height: 6),
-              _buildInfoRow('کد تامین کننده:', product.supplierCode.toString(),
-                  Icons.tag),
-
-              const SizedBox(height: 12),
-
-              // Price information
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildPriceInfo(
-                            'قیمت خرید:', product.purchasePrice, Colors.blue),
-                        _buildPriceInfo(
-                            'قیمت اصلی:', product.originalPrice, Colors.orange),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _buildPriceInfo(
-                        'قیمت نهایی:', product.discountedPrice, Colors.green),
-                  ],
+              // Slim barcode graphic (subtle)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  color: Colors.grey[50],
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: BarcodeWidget(
+                    barcode: Barcode.code128(),
+                    data: product.barcode,
+                    width: double.infinity,
+                    height: 36,
+                    drawText: false,
+                  ),
                 ),
               ),
             ],
@@ -169,7 +194,7 @@ class ProductCard extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          '${price.toStringAsFixed(0)} تومان',
+          PriceFormatter.formatPrice(price),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
@@ -177,6 +202,97 @@ class ProductCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPriceChip(double price) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green[100]!),
+      ),
+      child: Text(
+        PriceFormatter.formatPrice(price),
+        style: TextStyle(
+          color: Colors.green[700],
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  String _formatSupplierCode(double code) {
+    if (code.isNaN || code.isInfinite) return '';
+    if (code % 1 == 0) {
+      return code.toInt().toString();
+    }
+    // Trim trailing zeros without scientific notation
+    String s = code.toString();
+    if (s.contains('.')) {
+      s = s.replaceFirst(RegExp(r'0+$'), '');
+      s = s.replaceFirst(RegExp(r'\.$'), '');
+    }
+    return s;
+  }
+
+  Widget _buildDiscountInfo(Product product) {
+    double discountPercentage = product.getDiscountPercentage();
+    product.getDiscountAmount();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.red[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red[300]!, width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.local_offer,
+                size: 14,
+                color: Colors.red[700],
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${discountPercentage.toStringAsFixed(2)}% تخفیف',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red[700],
+                ),
+              ),
+            ],
+          ),
+        ],
+       
+      ),
+    );
+  }
+
+  Widget _buildDiscountPill(Product product) {
+    final percent = product.getDiscountPercentage();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.red[50],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '${percent.toStringAsFixed(0)}% تخفیف',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.red[700],
+        ),
+      ),
     );
   }
 }

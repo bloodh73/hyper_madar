@@ -3,6 +3,7 @@ import '../models/product.dart';
 import '../services/database_service.dart';
 import '../services/online_database_service.dart';
 
+
 class ProductProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final OnlineDatabaseService _onlineService = OnlineDatabaseService();

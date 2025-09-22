@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'providers/product_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+
 
 void main() {
   runApp(const MyApp());
@@ -18,6 +22,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'مدیریت محصولات',
         theme: ThemeData(
+          textTheme: GoogleFonts.vazirmatnTextTheme(),
           primarySwatch: Colors.blue,
           useMaterial3: true,
           fontFamily: 'Vazir', // Persian font
@@ -39,6 +44,15 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
+        localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fa', 'IR'), // فارسی
+      ],
+      locale: const Locale('fa', 'IR'),
         home: const MainScreen(),
         debugShowCheckedModeBanner: false,
       ),

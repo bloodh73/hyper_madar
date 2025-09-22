@@ -21,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 // تنظیمات دیتابیس
 $host = 'localhost';
 $dbname = 'vghzoegc_hyper'; // نام دیتابیس واقعی شما
-$username = 'vghzoegc'; // نام کاربری شما
-$password = ''; // رمز عبور شما
+$username = 'vghzoegc_hamed'; // نام کاربری شما
+$password = 'Hamed1373r'; // رمز عبور شما
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
@@ -38,6 +38,11 @@ $action = $_GET['action'] ?? '';
 
 // دریافت داده‌های JSON
 $input = json_decode(file_get_contents('php://input'), true);
+
+// اگر اکشن در QueryString نبود، از بدنه JSON بگیر
+if ((empty($action) || $action === '') && is_array($input) && isset($input['action']) && !empty($input['action'])) {
+    $action = $input['action'];
+}
 
 // مدیریت درخواست‌ها
 switch ($method) {
@@ -103,6 +108,50 @@ function handlePost($action, $data) {
         default:
             sendError('اکشن نامعتبر');
     }
+}
+
+/**
+ * نرمال‌سازی و تبدیل مقادیر ورودی محصول (از اکسل/JSON)
+ */
+function normalizeProductInput($raw) {
+    $out = [];
+    // Trim همه رشته‌ها
+    foreach ($raw as $k => $v) {
+        if (is_string($v)) {
+            $out[$k] = trim($v);
+        } else {
+            $out[$k] = $v;
+        }
+    }
+
+    // تبدیل اعداد متنی با ویرگول به عدد اعشاری
+    $num = function($val) {
+        if ($val === null || $val === '') return 0.0;
+        if (is_numeric($val)) return (float)$val;
+        if (is_string($val)) {
+            $clean = str_replace([',', '٬', ' '], '', $val);
+            return is_numeric($clean) ? (float)$clean : 0.0;
+        }
+        return 0.0;
+    };
+
+    $out['purchase_price']   = $num($out['purchase_price']   ?? 0);
+    $out['original_price']   = $num($out['original_price']   ?? 0);
+    $out['discounted_price'] = $num($out['discounted_price'] ?? 0);
+
+    // supplier_code را به رشته تبدیل کن (VARCHAR)
+    if (!isset($out['supplier_code']) || $out['supplier_code'] === null) {
+        $out['supplier_code'] = '';
+    } else {
+        $out['supplier_code'] = (string)$out['supplier_code'];
+    }
+
+    // barcode و product_name باید وجود داشته باشند
+    $out['barcode'] = isset($out['barcode']) ? (string)$out['barcode'] : '';
+    $out['product_name'] = isset($out['product_name']) ? (string)$out['product_name'] : '';
+    $out['supplier'] = isset($out['supplier']) ? (string)$out['supplier'] : '';
+
+    return $out;
 }
 
 /**
@@ -302,14 +351,13 @@ function createProduct($data) {
     global $pdo;
     
     try {
-        // اعتبارسنجی داده‌ها
-        $requiredFields = ['barcode', 'product_name', 'supplier', 'purchase_price', 'original_price', 'discounted_price', 'supplier_code'];
-        
-        foreach ($requiredFields as $field) {
-            if (!isset($data[$field]) || empty($data[$field])) {
-                sendError("فیلد $field الزامی است");
-                return;
-            }
+        // نرمال‌سازی
+        $data = normalizeProductInput($data);
+
+        // اعتبارسنجی حداقلی
+        if ($data['barcode'] === '' || $data['product_name'] === '') {
+            sendError('بارکد و نام محصول الزامی است');
+            return;
         }
         
         // بررسی تکراری نبودن بارکد
@@ -369,19 +417,14 @@ function createProducts($data) {
         
         foreach ($products as $index => $product) {
             try {
-                // اعتبارسنجی داده‌ها
-                $requiredFields = ['barcode', 'product_name', 'supplier', 'purchase_price', 'original_price', 'discounted_price', 'supplier_code'];
-                
-                $isValid = true;
-                foreach ($requiredFields as $field) {
-                    if (!isset($product[$field]) || empty($product[$field])) {
-                        $errors[] = "ردیف " . ($index + 1) . ": فیلد $field الزامی است";
-                        $isValid = false;
-                        break;
-                    }
+                // نرمال‌سازی
+                $product = normalizeProductInput($product);
+
+                // اعتبارسنجی حداقلی هر ردیف
+                if ($product['barcode'] === '' || $product['product_name'] === '') {
+                    $errors[] = "ردیف " . ($index + 1) . ": بارکد و نام محصول الزامی است";
+                    continue;
                 }
-                
-                if (!$isValid) continue;
                 
                 // بررسی تکراری نبودن بارکد
                 $checkStmt = $pdo->prepare("SELECT id FROM products WHERE barcode = :barcode");
@@ -415,7 +458,7 @@ function createProducts($data) {
         }
         
         $pdo->commit();
-        
+
         sendSuccess([
             'message' => 'وارد کردن محصولات تکمیل شد',
             'inserted_count' => count($insertedIds),

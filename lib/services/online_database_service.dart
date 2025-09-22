@@ -231,7 +231,9 @@ class OnlineDatabaseService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success']) {
-          return List<int>.from(data['data']['inserted_ids']);
+          // Convert string IDs to integers
+          List<dynamic> insertedIds = data['data']['inserted_ids'];
+          return insertedIds.map((id) => int.parse(id.toString())).toList();
         } else {
           throw Exception(data['error']);
         }

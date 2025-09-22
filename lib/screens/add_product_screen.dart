@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
+import '../utils/price_formatter.dart';
 
 class AddProductScreen extends StatefulWidget {
   final Product? product;
@@ -65,15 +66,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
 
     try {
+      // Parse formatted numbers (remove thousands separators)
+      final purchase = double.parse(_purchasePriceController.text.replaceAll(',', ''));
+      final original = double.parse(_originalPriceController.text.replaceAll(',', ''));
+      final discounted = double.parse(_discountedPriceController.text.replaceAll(',', ''));
+
       final product = Product(
         id: widget.product?.id,
         barcode: _barcodeController.text.trim(),
         productName: _productNameController.text.trim(),
         supplier: _supplierController.text.trim(),
         supplierCode: double.parse(_supplierCodeController.text.trim()),
-        purchasePrice: double.parse(_purchasePriceController.text),
-        originalPrice: double.parse(_originalPriceController.text),
-        discountedPrice: double.parse(_discountedPriceController.text),
+        purchasePrice: purchase,
+        originalPrice: original,
+        discountedPrice: discounted,
       );
 
       final productProvider = context.read<ProductProvider>();
@@ -218,59 +224,63 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
               const SizedBox(height: 16),
 
-              // Purchase Price Field
-              _buildTextField(
-                controller: _purchasePriceController,
-                label: 'قیمت خرید (تومان)',
-                icon: Icons.shopping_cart,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'لطفاً قیمت خرید را وارد کنید';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'لطفاً عدد معتبر وارد کنید';
-                  }
-                  return null;
-                },
+              // Prices (minimal, side-by-side)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _purchasePriceController,
+                      label: 'قیمت خرید (ریال)',
+                      icon: Icons.shopping_cart,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'الزامی';
+                        }
+                        if (double.tryParse(value.replaceAll(',', '')) == null) {
+                          return 'عدد نامعتبر';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _originalPriceController,
+                      label: 'قیمت اصلی (ریال)',
+                      icon: Icons.attach_money,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'الزامی';
+                        }
+                        if (double.tryParse(value.replaceAll(',', '')) == null) {
+                          return 'عدد نامعتبر';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // Original Price Field
-              _buildTextField(
-                controller: _originalPriceController,
-                label: 'قیمت اصلی (تومان)',
-                icon: Icons.attach_money,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'لطفاً قیمت اصلی را وارد کنید';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'لطفاً عدد معتبر وارد کنید';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Discounted Price Field
               _buildTextField(
                 controller: _discountedPriceController,
-                label: 'قیمت نهایی (تومان)',
+                label: 'قیمت نهایی (ریال)',
                 icon: Icons.local_offer,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: const [],
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'لطفاً قیمت نهایی را وارد کنید';
+                    return 'الزامی';
                   }
-                  if (double.tryParse(value) == null) {
-                    return 'لطفاً عدد معتبر وارد کنید';
+                  if (double.tryParse(value.replaceAll(',', '')) == null) {
+                    return 'عدد نامعتبر';
                   }
                   return null;
                 },

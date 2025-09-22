@@ -145,6 +145,8 @@
         }
 
         async function addTestProduct() {
+            // ارسال اکشن هم در Query و هم در بدنه برای سازگاری
+            const url = `${API_URL}?action=product`;
             const testProduct = {
                 action: 'product',
                 barcode: 'TEST' + Date.now(),
@@ -157,7 +159,7 @@
             };
 
             try {
-                const response = await fetch(API_URL, {
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
