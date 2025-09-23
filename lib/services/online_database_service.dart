@@ -46,7 +46,7 @@ class OnlineDatabaseService {
   }
 
   // دریافت تمام محصولات
-  Future<List<Product>> getAllProducts({int page = 1, int limit = 50}) async {
+  Future<List<Product>> getAllProducts({int page = 1, int limit = 5000000}) async {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl?action=products&page=$page&limit=$limit'),
@@ -71,7 +71,7 @@ class OnlineDatabaseService {
   }
 
   // جستجو در محصولات
-  Future<List<Product>> searchProducts(String query, {int page = 1, int limit = 50}) async {
+  Future<List<Product>> searchProducts(String query, {int page = 1, int limit = 1000}) async {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl?action=search&q=${Uri.encodeComponent(query)}&page=$page&limit=$limit'),

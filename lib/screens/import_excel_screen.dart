@@ -20,6 +20,8 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
   bool _isLoading = false;
   String _fileName = '';
   String _error = '';
+  int _loadedCount = 0;
+  int _totalCount = 0;
   ScaffoldMessengerState? _messenger;
   NavigatorState? _navigator;
 
@@ -191,8 +193,27 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
               ),
             ],
 
-            if (_importedProducts.isNotEmpty) ...[
-              const SizedBox(height: 24),
+            if (_isLoading) ...[              const SizedBox(height: 24),
+              Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: _totalCount > 0 ? _loadedCount / _totalCount : 0,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'در حال بارگذاری: $_loadedCount از $_totalCount محصول',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            if (_importedProducts.isNotEmpty && !_isLoading) ...[              const SizedBox(height: 24),
               Text(
                 'محصولات یافت شده: ${_importedProducts.length}',
                 style: const TextStyle(
@@ -326,6 +347,11 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
       
       List<Product> products = [];
       
+      setState(() {
+        _totalCount = lines.length - 1; // منهای سطر هدر
+        _loadedCount = 0;
+      });
+      
       // Skip header row (first line)
       for (int i = 1; i < lines.length; i++) {
         String line = lines[i].trim();
@@ -347,6 +373,9 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
           if (product.barcode.toString().isNotEmpty &&
               product.productName.isNotEmpty) {
             products.add(product);
+            setState(() {
+              _loadedCount++;
+            });
             print('Added CSV product: ${product.productName}');
           } else {
             print('Skipped CSV product: empty barcode or name');
@@ -381,6 +410,20 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
       var excel = Excel.decodeBytes(bytes);
 
       List<Product> products = [];
+      int totalRows = 0;
+
+      // محاسبه تعداد کل سطرها در همه شیت‌ها
+      for (var table in excel.tables.keys) {
+        var sheet = excel.tables[table];
+        if (sheet != null) {
+          totalRows += sheet.maxRows - 1; // منهای سطر هدر
+        }
+      }
+
+      setState(() {
+        _totalCount = totalRows;
+        _loadedCount = 0;
+      });
 
       for (var table in excel.tables.keys) {
         var sheet = excel.tables[table];
@@ -403,6 +446,9 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
             if (product.barcode.toString().isNotEmpty &&
                 product.productName.isNotEmpty) {
               products.add(product);
+              setState(() {
+                _loadedCount++;
+              });
               print('Added product: ${product.productName}');
             } else {
               print('Skipped product: empty barcode or name');

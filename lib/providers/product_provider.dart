@@ -11,8 +11,8 @@ class ProductProvider with ChangeNotifier {
   List<Product> _products = [];
   bool _isLoading = false;
   String _error = '';
-  bool _useMySQL = false;
-  bool _useOnline = true; // استفاده از دیتابیس آنلاین به عنوان پیش‌فرض
+  bool _useMySQL = false; // غیرفعال کردن MySQL به عنوان پیش‌فرض
+  bool _useOnline = true; // استفاده از API آنلاین به عنوان پیش‌فرض
 
   List<Product> get products => _products;
   bool get isLoading => _isLoading;
@@ -35,6 +35,55 @@ class ProductProvider with ChangeNotifier {
       _products = [];
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Get unique suppliers only (optimized for large datasets)
+  Future<List<String>> getSuppliers() async {
+    try {
+      if (_useOnline) {
+        // For online API, extract suppliers from loaded products
+        if (_products.isEmpty) {
+          await loadProducts(); // Load products first if not loaded
+        }
+        final suppliers = _products.map((p) => p.supplier).toSet().toList();
+        suppliers.sort();
+        return suppliers;
+      } else {
+        // Use database query for better performance
+        return await _databaseService.getSuppliers(useMySQL: _useMySQL);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Get product count for a specific supplier
+  int getSupplierProductCount(String supplier) {
+    if (_products.isEmpty) return 0;
+    
+    // Use a simple counter for better performance
+    int count = 0;
+    for (final product in _products) {
+      if (product.supplier == supplier) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // Get supplier product count from database (more accurate)
+  Future<int> getSupplierProductCountFromDB(String supplier) async {
+    try {
+      if (_useOnline) {
+        // For online, use the local method
+        return getSupplierProductCount(supplier);
+      } else {
+        return await _databaseService.getSupplierProductCount(supplier, useMySQL: _useMySQL);
+      }
+    } catch (e) {
+      print('Error getting supplier count from DB: $e');
+      return getSupplierProductCount(supplier); // Fallback to local method
     }
   }
 
@@ -77,7 +126,9 @@ class ProductProvider with ChangeNotifier {
       return false;
     } catch (e) {
       _error = 'خطا در افزودن محصول: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return false;
     }
   }
@@ -98,7 +149,9 @@ class ProductProvider with ChangeNotifier {
       return false;
     } catch (e) {
       _error = 'خطا در بروزرسانی محصول: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return false;
     }
   }
@@ -119,7 +172,9 @@ class ProductProvider with ChangeNotifier {
       return false;
     } catch (e) {
       _error = 'خطا در حذف محصول: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return false;
     }
   }
@@ -134,7 +189,9 @@ class ProductProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = 'خطا در دریافت محصول: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return null;
     }
   }
@@ -152,7 +209,9 @@ class ProductProvider with ChangeNotifier {
       return insertedIds;
     } catch (e) {
       _error = 'خطا در وارد کردن محصولات: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return [];
     }
   }
@@ -184,7 +243,9 @@ class ProductProvider with ChangeNotifier {
       return false;
     } catch (e) {
       _error = 'خطا در اتصال به MySQL: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return false;
     }
   }
@@ -198,7 +259,10 @@ class ProductProvider with ChangeNotifier {
 
   void _setLoading(bool loading) {
     _isLoading = loading;
-    notifyListeners();
+    // Use microtask to avoid calling notifyListeners during build
+    Future.microtask(() {
+      notifyListeners();
+    });
   }
 
   // Toggle online database
@@ -217,13 +281,191 @@ class ProductProvider with ChangeNotifier {
       return stats['connection_status'] == 'connected';
     } catch (e) {
       _error = 'خطا در اتصال به دیتابیس آنلاین: $e';
-      notifyListeners();
+      Future.microtask(() {
+        notifyListeners();
+      });
       return false;
     }
   }
 
   void clearError() {
     _error = '';
-    notifyListeners();
+    Future.microtask(() {
+      notifyListeners();
+    });
+  }
+
+  // ===== SUPPLIER MANAGEMENT METHODS =====
+
+  // Get suppliers with detailed information and product counts
+  Future<List<Map<String, dynamic>>> getSuppliersWithDetails() async {
+    try {
+      if (_useOnline) {
+        // For online API, we'll enhance the existing getSuppliers method
+        final suppliers = await getSuppliers();
+        final List<Map<String, dynamic>> detailedSuppliers = [];
+        
+        for (String supplierName in suppliers) {
+          final count = await getSupplierProductCountFromDB(supplierName);
+          detailedSuppliers.add({
+            'supplier_name': supplierName,
+            'product_count': count,
+            'contact_person': null,
+            'phone': null,
+            'email': null,
+            'address': null,
+            'description': null,
+            'is_active': true,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        }
+        return detailedSuppliers;
+      } else {
+        return await _databaseService.getSuppliersWithCounts(useMySQL: _useMySQL);
+      }
+    } catch (e) {
+      _error = 'خطا در دریافت اطلاعات تامین‌کنندگان: $e';
+      Future.microtask(() {
+        notifyListeners();
+      });
+      return [];
+    }
+  }
+
+  // Get a single supplier by ID
+  Future<Map<String, dynamic>?> getSupplierById(int id) async {
+    try {
+      if (_useOnline) {
+        // For online API, we don't have individual supplier records
+        return null;
+      } else {
+        return await _databaseService.getSupplierById(id, useMySQL: _useMySQL);
+      }
+    } catch (e) {
+      _error = 'خطا در دریافت اطلاعات تامین‌کننده: $e';
+      Future.microtask(() {
+        notifyListeners();
+      });
+      return null;
+    }
+  }
+
+  // Add new supplier
+  Future<bool> addSupplier(Map<String, dynamic> supplierData) async {
+    try {
+      int id;
+      if (_useOnline) {
+        // For online API, suppliers are managed through products
+        _error = 'افزودن تامین‌کننده در حالت آنلاین پشتیبانی نمی‌شود';
+        Future.microtask(() {
+          notifyListeners();
+        });
+        return false;
+      } else {
+        id = await _databaseService.insertSupplier(supplierData, useMySQL: _useMySQL);
+      }
+      return id > 0;
+    } catch (e) {
+      _error = 'خطا در افزودن تامین‌کننده: $e';
+      Future.microtask(() {
+        notifyListeners();
+      });
+      return false;
+    }
+  }
+
+  // Update supplier
+  Future<bool> updateSupplier(Map<String, dynamic> supplierData) async {
+    try {
+      int result;
+      if (_useOnline) {
+        // For online API, suppliers are managed through products
+        _error = 'بروزرسانی تامین‌کننده در حالت آنلاین پشتیبانی نمی‌شود';
+        Future.microtask(() {
+          notifyListeners();
+        });
+        return false;
+      } else {
+        result = await _databaseService.updateSupplier(supplierData, useMySQL: _useMySQL);
+      }
+      return result > 0;
+    } catch (e) {
+      _error = 'خطا در بروزرسانی تامین‌کننده: $e';
+      Future.microtask(() {
+        notifyListeners();
+      });
+      return false;
+    }
+  }
+
+  // Delete supplier
+  Future<bool> deleteSupplier(int id) async {
+    try {
+      int result;
+      if (_useOnline) {
+        // For online API, suppliers are managed through products
+        _error = 'حذف تامین‌کننده در حالت آنلاین پشتیبانی نمی‌شود';
+        Future.microtask(() {
+          notifyListeners();
+        });
+        return false;
+      } else {
+        result = await _databaseService.deleteSupplier(id, useMySQL: _useMySQL);
+        if (result == -1) {
+          _error = 'نمی‌توان تامین‌کننده‌ای را که محصول دارد حذف کرد';
+          Future.microtask(() {
+            notifyListeners();
+          });
+          return false;
+        }
+      }
+      return result > 0;
+    } catch (e) {
+      _error = 'خطا در حذف تامین‌کننده: $e';
+      Future.microtask(() {
+        notifyListeners();
+      });
+      return false;
+    }
+  }
+
+  // Search suppliers
+  Future<List<Map<String, dynamic>>> searchSuppliers(String query) async {
+    try {
+      if (_useOnline) {
+        // For online API, search in existing suppliers
+        final allSuppliers = await getSuppliers();
+        final filteredSuppliers = allSuppliers
+            .where((supplier) => supplier.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+        
+        final List<Map<String, dynamic>> detailedSuppliers = [];
+        for (String supplierName in filteredSuppliers) {
+          final count = await getSupplierProductCountFromDB(supplierName);
+          detailedSuppliers.add({
+            'supplier_name': supplierName,
+            'product_count': count,
+            'contact_person': null,
+            'phone': null,
+            'email': null,
+            'address': null,
+            'description': null,
+            'is_active': true,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        }
+        return detailedSuppliers;
+      } else {
+        return await _databaseService.searchSuppliers(query, useMySQL: _useMySQL);
+      }
+    } catch (e) {
+      _error = 'خطا در جستجوی تامین‌کنندگان: $e';
+      Future.microtask(() {
+        notifyListeners();
+      });
+      return [];
+    }
   }
 }

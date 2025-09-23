@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/product_provider.dart';
 import '../widgets/product_card.dart';
 import '../widgets/search_bar.dart';
 import 'add_product_screen.dart';
 import 'import_excel_screen.dart';
+import 'suppliers_screen.dart';
+import 'suppliers_management_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,8 +22,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProductProvider>().loadProducts();
+    // Use a microtask to ensure this runs after the current build cycle
+    Future.microtask(() {
+      if (mounted) {
+        context.read<ProductProvider>().loadProducts();
+      }
     });
   }
 
@@ -38,15 +44,95 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showScannerDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: SizedBox(
+          height: 400,
+          child: Column(
+            children: [
+              Expanded(
+                child: MobileScanner(
+                  onDetect: (capture) {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty) {
+                      final String? code = barcodes.first.rawValue;
+                      if (code != null) {
+                        Navigator.pop(context);
+                        context.read<ProductProvider>().searchProducts(code);
+                      }
+                    }
+                  },
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('لغو'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('مدیریت محصولات'),
+        title: Consumer<ProductProvider>(
+          builder: (context, provider, child) {
+            return Row(
+              children: [
+                const Text('مدیریت محصولات'),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${provider.products.length} محصول',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
         backgroundColor: Colors.blue[600],
         foregroundColor: Colors.white,
-        elevation: 0,
+        elevation: 2,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.business),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SuppliersManagementScreen(),
+                ),
+              );
+            },
+            tooltip: 'مدیریت تامین‌کنندگان',
+          ),
+          IconButton(
+            icon: const Icon(Icons.people),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SuppliersScreen(),
+                ),
+              );
+            },
+            tooltip: 'تامین کنندگان',
+          ),
           IconButton(
             icon: const Icon(Icons.file_upload),
             onPressed: () {
@@ -66,11 +152,27 @@ class _HomeScreenState extends State<HomeScreen> {
           // Search Bar
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.blue[50],
-            child: CustomSearchBar(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              hintText: 'جستجو در محصولات...',
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                CustomSearchBar(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  hintText: 'جستجو در محصولات...',
+                ),
+                const SizedBox(height: 12),
+              
+              ],
             ),
           ),
           
@@ -124,23 +226,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemCount: productProvider.products.length,
                     itemBuilder: (context, index) {
                       final product = productProvider.products[index];
-                      return ProductCard(
-                        product: product,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AddProductScreen(
-                                product: product,
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        child: ProductCard(
+                          product: product,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AddProductScreen(
+                                  product: product,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                        onDelete: () async {
-                          await _showDeleteDialog(context, product);
-                        },
+                            );
+                          },
+                          onDelete: () async {
+                            await _showDeleteDialog(context, product);
+                          },
+                        ),
                       );
                     },
+                    // Optimize for large lists
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    cacheExtent: 200.0,
                   ),
                 );
               },
@@ -148,17 +258,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddProductScreen(),
-            ),
-          );
+          _showScannerDialog(context);
         },
+        label: const Text('اسکن بارکد', style: TextStyle(color: Colors.white)),
+        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
         backgroundColor: Colors.blue[600],
-        child: const Icon(Icons.add, color: Colors.white),
+        elevation: 4,
       ),
     );
   }

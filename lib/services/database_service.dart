@@ -11,12 +11,12 @@ class DatabaseService {
   Database? _database;
   MySqlConnection? _mysqlConnection;
 
-  // MySQL Configuration
-  static const String _host = 'localhost';
+  // MySQL Configuration - Use AppConfig values
+  static const String _host = 'blizzardping.ir';  // Remote MySQL server
   static const int _port = 3306;
-  static const String _user = 'root';
-  static const String _password = '';
-  static const String _dbName = 'product_manager';
+  static const String _user = 'vghzoegc_hamed';
+  static const String _password = 'Hamed1373r';
+  static const String _dbName = 'vghzoegc_hyper';
 
   // Local SQLite database
   Future<Database> get database async {
@@ -171,6 +171,50 @@ class DatabaseService {
     }
   }
 
+  // Get unique suppliers only (optimized for large datasets)
+  Future<List<String>> getSuppliers({bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var results = await _mysqlConnection!.query(
+          'SELECT DISTINCT TRIM(supplier) as supplier FROM products WHERE supplier IS NOT NULL AND TRIM(supplier) != "" ORDER BY TRIM(supplier)'
+        );
+        return results.map((row) => row['supplier'] as String).toList();
+      } catch (e) {
+        print('MySQL get suppliers error: $e');
+        return [];
+      }
+    } else {
+      final db = await database;
+      final List<Map<String, dynamic>> result = await db.rawQuery(
+        'SELECT DISTINCT TRIM(supplier) as supplier FROM products WHERE supplier IS NOT NULL AND TRIM(supplier) != "" ORDER BY TRIM(supplier)'
+      );
+      return result.map((row) => row['supplier'] as String).toList();
+    }
+  }
+
+  // Get product count for a specific supplier
+  Future<int> getSupplierProductCount(String supplier, {bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var results = await _mysqlConnection!.query(
+          'SELECT COUNT(*) as count FROM products WHERE TRIM(supplier) = TRIM(?)',
+          [supplier],
+        );
+        return results.first.fields['count'] as int? ?? 0;
+      } catch (e) {
+        print('MySQL get supplier count error: $e');
+        return 0;
+      }
+    } else {
+      final db = await database;
+      final List<Map<String, dynamic>> result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM products WHERE TRIM(supplier) = TRIM(?)',
+        [supplier],
+      );
+      return result.first['count'] as int? ?? 0;
+    }
+  }
+
   Future<List<Product>> searchProducts(String query, {bool useMySQL = false}) async {
     if (useMySQL && _mysqlConnection != null) {
       try {
@@ -289,5 +333,203 @@ class DatabaseService {
     }
     
     return insertedIds;
+  }
+
+  // ===== SUPPLIER MANAGEMENT METHODS =====
+
+  // Get all suppliers with their product counts
+  Future<List<Map<String, dynamic>>> getSuppliersWithCounts({bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var results = await _mysqlConnection!.query('''
+          SELECT 
+            s.id,
+            s.supplier_name,
+            s.contact_person,
+            s.phone,
+            s.email,
+            s.address,
+            s.description,
+            s.is_active,
+            s.created_at,
+            s.updated_at,
+            COUNT(p.id) as product_count
+          FROM suppliers s
+          LEFT JOIN products p ON s.id = p.supplier_id
+          GROUP BY s.id, s.supplier_name, s.contact_person, s.phone, s.email, s.address, s.description, s.is_active, s.created_at, s.updated_at
+          ORDER BY s.supplier_name
+        ''');
+        return results.map((row) => row.fields).toList();
+      } catch (e) {
+        print('MySQL get suppliers with counts error: $e');
+        return [];
+      }
+    } else {
+      // For SQLite, we'll use the existing getSuppliers method and enhance it
+      final db = await database;
+      final List<Map<String, dynamic>> result = await db.rawQuery('''
+        SELECT 
+          TRIM(supplier) as supplier_name,
+          COUNT(*) as product_count
+        FROM products 
+        WHERE supplier IS NOT NULL AND TRIM(supplier) != ''
+        GROUP BY TRIM(supplier)
+        ORDER BY TRIM(supplier)
+      ''');
+      return result;
+    }
+  }
+
+  // Get a single supplier by ID
+  Future<Map<String, dynamic>?> getSupplierById(int id, {bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var results = await _mysqlConnection!.query(
+          'SELECT * FROM suppliers WHERE id = ?',
+          [id],
+        );
+        if (results.isNotEmpty) {
+          return results.first.fields;
+        }
+        return null;
+      } catch (e) {
+        print('MySQL get supplier by ID error: $e');
+        return null;
+      }
+    } else {
+      // For SQLite, we don't have a suppliers table, so return null
+      return null;
+    }
+  }
+
+  // Insert a new supplier
+  Future<int> insertSupplier(Map<String, dynamic> supplierData, {bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var result = await _mysqlConnection!.query(
+          'INSERT INTO suppliers (supplier_name, contact_person, phone, email, address, description, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            supplierData['supplier_name'],
+            supplierData['contact_person'],
+            supplierData['phone'],
+            supplierData['email'],
+            supplierData['address'],
+            supplierData['description'],
+            supplierData['is_active'] ?? true,
+          ],
+        );
+        return result.insertId ?? 0;
+      } catch (e) {
+        print('MySQL insert supplier error: $e');
+        return 0;
+      }
+    } else {
+      // For SQLite, we don't have a suppliers table, so return 0
+      return 0;
+    }
+  }
+
+  // Update an existing supplier
+  Future<int> updateSupplier(Map<String, dynamic> supplierData, {bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var result = await _mysqlConnection!.query(
+          'UPDATE suppliers SET supplier_name = ?, contact_person = ?, phone = ?, email = ?, address = ?, description = ?, is_active = ?, updated_at = NOW() WHERE id = ?',
+          [
+            supplierData['supplier_name'],
+            supplierData['contact_person'],
+            supplierData['phone'],
+            supplierData['email'],
+            supplierData['address'],
+            supplierData['description'],
+            supplierData['is_active'] ?? true,
+            supplierData['id'],
+          ],
+        );
+        return result.affectedRows ?? 0;
+      } catch (e) {
+        print('MySQL update supplier error: $e');
+        return 0;
+      }
+    } else {
+      // For SQLite, we don't have a suppliers table, so return 0
+      return 0;
+    }
+  }
+
+  // Delete a supplier (only if they have no products)
+  Future<int> deleteSupplier(int id, {bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        // First check if supplier has any products
+        var productCheck = await _mysqlConnection!.query(
+          'SELECT COUNT(*) as count FROM products WHERE supplier_id = ?',
+          [id],
+        );
+        
+        int productCount = productCheck.first.fields['count'] as int? ?? 0;
+        if (productCount > 0) {
+          print('Cannot delete supplier: they have $productCount products');
+          return -1; // Return -1 to indicate supplier has products
+        }
+
+        // If no products, proceed with deletion
+        var result = await _mysqlConnection!.query(
+          'DELETE FROM suppliers WHERE id = ?',
+          [id],
+        );
+        return result.affectedRows ?? 0;
+      } catch (e) {
+        print('MySQL delete supplier error: $e');
+        return 0;
+      }
+    } else {
+      // For SQLite, we don't have a suppliers table, so return 0
+      return 0;
+    }
+  }
+
+  // Search suppliers by name
+  Future<List<Map<String, dynamic>>> searchSuppliers(String query, {bool useMySQL = false}) async {
+    if (useMySQL && _mysqlConnection != null) {
+      try {
+        var results = await _mysqlConnection!.query('''
+          SELECT 
+            s.id,
+            s.supplier_name,
+            s.contact_person,
+            s.phone,
+            s.email,
+            s.address,
+            s.description,
+            s.is_active,
+            s.created_at,
+            s.updated_at,
+            COUNT(p.id) as product_count
+          FROM suppliers s
+          LEFT JOIN products p ON s.id = p.supplier_id
+          WHERE s.supplier_name LIKE ? OR s.contact_person LIKE ? OR s.phone LIKE ?
+          GROUP BY s.id, s.supplier_name, s.contact_person, s.phone, s.email, s.address, s.description, s.is_active, s.created_at, s.updated_at
+          ORDER BY s.supplier_name
+        ''', ['%$query%', '%$query%', '%$query%']);
+        return results.map((row) => row.fields).toList();
+      } catch (e) {
+        print('MySQL search suppliers error: $e');
+        return [];
+      }
+    } else {
+      // For SQLite, fall back to the existing supplier search
+      final db = await database;
+      final List<Map<String, dynamic>> result = await db.rawQuery('''
+        SELECT 
+          TRIM(supplier) as supplier_name,
+          COUNT(*) as product_count
+        FROM products 
+        WHERE supplier IS NOT NULL AND TRIM(supplier) != '' AND TRIM(supplier) LIKE ?
+        GROUP BY TRIM(supplier)
+        ORDER BY TRIM(supplier)
+      ''', ['%$query%']);
+      return result;
+    }
   }
 }

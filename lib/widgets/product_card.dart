@@ -21,13 +21,18 @@ class ProductCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
+      elevation: 3,
+      shadowColor: Colors.black.withOpacity(0.15),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Colors.grey.withOpacity(0.1),
+          width: 1,
+        ),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -72,15 +77,37 @@ class ProductCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                 
                   const SizedBox(width: 8),
                   hasDiscount
                       ? _buildDiscountPill(product)
                       : _buildPriceChip(product.discountedPrice),
                   if (onDelete != null)
-                    IconButton(
-                      icon: const Icon(Icons.more_vert, color: Colors.grey),
-                      onPressed: onDelete,
-                      tooltip: 'حذف محصول',
+                    Material(
+                      color: Colors.transparent,
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, color: Colors.grey),
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            onDelete?.call();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, color: Colors.red[700], size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'حذف محصول',
+                                  style: TextStyle(color: Colors.red[700]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -147,80 +174,46 @@ class ProductCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-      ],
+    
     );
   }
 
-  Widget _buildPriceInfo(String label, double price, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          PriceFormatter.formatPrice(price),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
+
+  
 
   Widget _buildPriceChip(double price) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.green[50],
+        gradient: LinearGradient(
+          colors: [
+            Colors.green[400]!,
+            Colors.green[600]!,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.green[100]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green[200]!.withOpacity(0.5),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         PriceFormatter.formatPrice(price),
-        style: TextStyle(
-          color: Colors.green[700],
+        style: const TextStyle(
+          color: Colors.white,
           fontWeight: FontWeight.w700,
-          fontSize: 12,
+          fontSize: 13,
         ),
       ),
+         
     );
   }
 
@@ -238,60 +231,47 @@ class ProductCard extends StatelessWidget {
     return s;
   }
 
-  Widget _buildDiscountInfo(Product product) {
-    double discountPercentage = product.getDiscountPercentage();
-    product.getDiscountAmount();
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.red[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red[300]!, width: 1),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.local_offer,
-                size: 14,
-                color: Colors.red[700],
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${discountPercentage.toStringAsFixed(2)}% تخفیف',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red[700],
-                ),
-              ),
-            ],
-          ),
-        ],
-       
-      ),
-    );
-  }
 
   Widget _buildDiscountPill(Product product) {
     final percent = product.getDiscountPercentage();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.red[50],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        '${percent.toStringAsFixed(0)}% تخفیف',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: Colors.red[700],
+        gradient: LinearGradient(
+          colors: [
+            Colors.red[400]!,
+            Colors.red[600]!,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red[200]!.withOpacity(0.5),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.local_offer,
+            size: 12,
+            color: Colors.white.withOpacity(0.9),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${percent.toStringAsFixed(0)}%',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
